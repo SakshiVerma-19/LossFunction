@@ -1,0 +1,80 @@
+{
+    "roc_auc": 0.9999976090054419,
+    "pr_auc": 0.9994462901439647,
+    "latency": {
+        "tier1_avg_ms": 0.0,
+        "tier2_queue_ms": 45.2
+    },
+    "costs": {
+        "allow_all": 1759184.88,
+        "limit_large": 39317365.267400004,
+        "static_ml": 3860.0,
+        "cost_optimal": 3860.0,
+        "savings_vs_allow_all": 1755324.88,
+        "savings_vs_static_ml": 0.0
+    },
+    "personas": {
+        "digital_saas": {
+            "name": "Digital SaaS & Subscriptions",
+            "allow_all": 19800.0,
+            "limit_large": 19800.0,
+            "static_ml": 2200.0,
+            "cost_optimal": 2200.0,
+            "savings_vs_allow_all": 17600.0,
+            "savings_vs_static_ml": 0.0,
+            "avg_p_star": 0.6925832103798215
+        },
+        "electronics": {
+            "name": "High-Value Electronics Retail",
+            "allow_all": 1279825.64,
+            "limit_large": 12078476.754399987,
+            "static_ml": 880.0,
+            "cost_optimal": 880.0,
+            "savings_vs_allow_all": 1278945.64,
+            "savings_vs_static_ml": 0.0,
+            "avg_p_star": 0.09152005955031278
+        },
+        "quick_commerce": {
+            "name": "Quick Commerce & Food Delivery",
+            "allow_all": 44257.159999999996,
+            "limit_large": 44257.159999999996,
+            "static_ml": 330.0,
+            "cost_optimal": 330.0,
+            "savings_vs_allow_all": 43927.159999999996,
+            "savings_vs_static_ml": 0.0,
+            "avg_p_star": 0.4573371032245645
+        },
+        "gaming_assets": {
+            "name": "Gaming & Digital Assets",
+            "allow_all": 415302.08,
+            "limit_large": 27174831.35300002,
+            "static_ml": 450.0,
+            "cost_optimal": 450.0,
+            "savings_vs_allow_all": 414852.08,
+            "savings_vs_static_ml": 0.0,
+            "avg_p_star": 0.39132227791076757
+        }
+    },
+    "confusion_matrices": {
+        "static_ml": [
+            [
+                9958,
+                0
+            ],
+            [
+                1,
+                41
+            ]
+        ],
+        "cost_optimal": [
+            [
+                9958,
+                0
+            ],
+            [
+                1,
+                41
+            ]
+        ]
+    }
+}

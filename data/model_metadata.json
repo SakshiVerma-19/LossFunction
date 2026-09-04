@@ -1,0 +1,105 @@
+{
+    "tier1_features": [
+        "amount_scaled",
+        "hour_ist",
+        "time_mcc_anomaly",
+        "velocity_1h",
+        "card_testing_velocity_60s",
+        "mcc_fraud_rate",
+        "bin_regional_risk"
+    ],
+    "tier2_features": [
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "amount_scaled",
+        "amount_vs_historical_ratio",
+        "pincode_distance_risk",
+        "card_testing_velocity_60s",
+        "bin_regional_risk",
+        "time_mcc_anomaly",
+        "device_mismatch",
+        "ip_mismatch",
+        "velocity_1h",
+        "hour_ist",
+        "mcc_fraud_rate"
+    ],
+    "mcc_encoding": {
+        "5732": 0.009007223555288942,
+        "5734": 0.009501423860911271,
+        "5812": 0.008014454437635897,
+        "7995": 0.009593447336561745
+    },
+    "global_prior": 0.009025,
+    "personas_config": {
+        "digital_saas": {
+            "name": "Digital SaaS & Subscriptions",
+            "margin": 0.85,
+            "is_digital": true,
+            "C_chargeback_fee": 1500,
+            "C_penalty": 300,
+            "C_friction": 250,
+            "C_churn": 3000,
+            "C_review": 40
+        },
+        "electronics": {
+            "name": "High-Value Electronics Retail",
+            "margin": 0.08,
+            "is_digital": false,
+            "C_chargeback_fee": 1500,
+            "C_penalty": 500,
+            "C_friction": 300,
+            "C_churn": 800,
+            "C_review": 80
+        },
+        "quick_commerce": {
+            "name": "Quick Commerce & Food Delivery",
+            "margin": 0.15,
+            "is_digital": false,
+            "C_chargeback_fee": 1000,
+            "C_penalty": 200,
+            "C_friction": 150,
+            "C_churn": 1500,
+            "C_review": 30
+        },
+        "gaming_assets": {
+            "name": "Gaming & Digital Assets",
+            "margin": 0.7,
+            "is_digital": false,
+            "C_chargeback_fee": 1800,
+            "C_penalty": 600,
+            "C_friction": 200,
+            "C_churn": 600,
+            "C_review": 50
+        }
+    },
+    "latency_benchmarks": {
+        "tier1_single_tx_ms": 0.001,
+        "tier2_queue_ms": 45.2
+    }
+}
