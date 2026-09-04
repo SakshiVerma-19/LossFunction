@@ -186,7 +186,7 @@ function App() {
 
           <div className="api-status">
             <span className={`status-dot ${!apiConnected ? 'offline' : ''}`}></span>
-            <span>{apiConnected ? 'API Connected (Port 8000)' : 'API Disconnected'}</span>
+            <span>{apiConnected ? 'API Connected' : 'API Disconnected'}</span>
           </div>
 
           <div className="profile" title="Risk Analyst">

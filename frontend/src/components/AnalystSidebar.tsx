@@ -170,9 +170,10 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
     : (selectedTx.true_class === 1
         ? `Ground Truth: Verified Fraud. Analyst action logged: ${selectedTx.status}.`
         : `Ground Truth: Genuine Customer. Analyst action logged: ${selectedTx.status}.`);
+  const isHeldAction = selectedTx.status === 'Hold' || selectedTx.status === 'Held';
   const isFeedbackSuccess = actionFeedback
-    ? (selectedTx.status === 'Hold' ? actionFeedback.true_class === 1 : actionFeedback.true_class === 0)
-    : (selectedTx.status === 'Held' ? selectedTx.true_class === 1 : selectedTx.true_class === 0);
+    ? (isHeldAction ? actionFeedback.true_class === 1 : actionFeedback.true_class === 0)
+    : (isHeldAction ? selectedTx.true_class === 1 : selectedTx.true_class === 0);
 
   // Formulate concise Top-3 SHAP badges for quick explainability
   const getShortReasonTitle = (reasonText: string) => {

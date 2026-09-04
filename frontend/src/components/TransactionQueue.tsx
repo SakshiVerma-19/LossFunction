@@ -57,7 +57,10 @@ export const TransactionQueue: React.FC<QueueProps> = ({
     const matchesAction =
       filterAction === 'ALL' || tx.suggested_action.toUpperCase() === filterAction;
     const matchesStatus =
-      filterStatus === 'ALL' || tx.status.toUpperCase() === filterStatus;
+      filterStatus === 'ALL' ||
+      (filterStatus === 'ALLOWED' && (tx.status === 'Allowed' || tx.status === 'Allow')) ||
+      (filterStatus === 'HELD' && (tx.status === 'Held' || tx.status === 'Hold')) ||
+      (filterStatus === 'PENDING' && tx.status === 'Pending');
     const matchesSearch =
       tx.tx_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.customer_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -165,12 +168,11 @@ export const TransactionQueue: React.FC<QueueProps> = ({
             ) : (
               filteredTransactions.map((tx) => {
                 const isSelected = selectedTxId === tx.tx_id;
-                const statusClass =
-                  tx.status === 'Allowed' ? 'approved' :
-                  tx.status === 'Held' ? 'flagged' : 'pending';
-                const statusLabel =
-                  tx.status === 'Allowed' ? 'Approved' :
-                  tx.status === 'Held' ? 'Flagged' : 'Pending';
+                const isApproved = tx.status === 'Allowed' || tx.status === 'Allow';
+                const isHeld = tx.status === 'Held' || tx.status === 'Hold';
+
+                const statusClass = isApproved ? 'approved' : isHeld ? 'flagged' : 'pending';
+                const statusLabel = isApproved ? 'Approved' : isHeld ? 'Flagged' : 'Pending';
 
                 const isPincodeMismatch = tx.billing_pincode !== tx.shipping_pincode;
 

@@ -113,7 +113,13 @@ def get_transactions(
     records = []
     for _, row in queue_df.iterrows():
         tx_id = row['tx_id']
-        status = review_decisions.get(tx_id, "Pending")
+        raw_status = review_decisions.get(tx_id, "Pending")
+        if raw_status in ["Allow", "Allowed"]:
+            status = "Allowed"
+        elif raw_status in ["Hold", "Held"]:
+            status = "Held"
+        else:
+            status = "Pending"
         prob = float(row['fraud_probability'])
         thresh = float(row['cost_optimal_threshold'])
         
@@ -197,8 +203,11 @@ def get_metrics(persona: Optional[str] = Query(None)):
             # Allow All baseline
             total_allow_all_cost += fn_cost if is_fraud == 1 else 0.0
             
-            # HITL decision (or model default if pending)
-            decision = review_decisions.get(tx_id, "Hold" if prob > thresh else "Allow")
+            raw_dec = review_decisions.get(tx_id, None)
+            if raw_dec:
+                decision = "Hold" if raw_dec in ["Hold", "Held"] else "Allow"
+            else:
+                decision = "Hold" if prob > thresh else "Allow"
             if decision == "Hold":
                 hitl_cost = cfg["C_review"] if is_fraud == 1 else fp_cost
             else:
@@ -230,14 +239,14 @@ def get_explanation(tx_id: str, persona: Optional[str] = Query(None)):
     row = predictions_df.loc[idx]
     
     features = model_metadata['tier2_features']
-    row_features = row[features]
     row_shap = shap_values[idx]
     
     shap_chart_data = []
-    for f_name, val, s_val in zip(features, row_features, row_shap):
+    for f_name, s_val in zip(features, row_shap):
+        val = float(row[f_name]) if f_name in row else 0.0
         shap_chart_data.append({
             "feature": f_name,
-            "value": float(val),
+            "value": val,
             "shap_value": float(s_val)
         })
         
@@ -329,7 +338,7 @@ def take_action(request: ActionRequest):
     if matches.empty:
         raise HTTPException(status_code=404, detail="Transaction ID not found.")
         
-    review_decisions[tx_id] = action
+    review_decisions[tx_id] = "Allowed" if action == "Allow" else "Held"
     row = matches.iloc[0]
     
     true_class = int(row['Class'])
