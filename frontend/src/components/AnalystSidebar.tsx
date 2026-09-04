@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Transaction } from './TransactionQueue';
+import { type Transaction } from './TransactionQueue';
 
 interface SidebarProps {
   selectedTx: Transaction | null;
   selectedPersona: string;
   onDecisionMade: (txId: string, action: 'Allow' | 'Hold', feedbackMsg: string) => void;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
 }
 
 interface ExplanationData {
@@ -36,7 +38,9 @@ interface ExplanationData {
 export const AnalystSidebar: React.FC<SidebarProps> = ({
   selectedTx,
   selectedPersona,
-  onDecisionMade
+  onDecisionMade,
+  isMinimized = false,
+  onToggleMinimize
 }) => {
   const [explanation, setExplanation] = useState<ExplanationData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -56,7 +60,7 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
 
     setLoading(true);
     setActionFeedback(null);
-    
+
     const personaQuery = selectedPersona !== 'all' ? `?persona=${selectedPersona}` : '';
     fetch(`http://127.0.0.1:8000/api/explain/${selectedTx.tx_id}${personaQuery}`)
       .then((res) => {
@@ -86,13 +90,13 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
 
       if (!response.ok) throw new Error("Action API failed");
       const data = await response.json();
-      
+
       setActionFeedback({
         status: data.status,
         feedback_message: data.feedback_message,
         true_class: data.true_class
       });
-      
+
       onDecisionMade(selectedTx.tx_id, action, data.feedback_message);
     } catch (err) {
       console.error(err);
@@ -102,17 +106,42 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  if (isMinimized) return null;
+
+  const renderHeader = (title: string, subtitle?: string) => (
+    <div className="inspection-header">
+      <div>
+        <h3>{title}</h3>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+
+      {onToggleMinimize && (
+        <button className="minimize-btn" onClick={onToggleMinimize} title="Minimize Inspection tab to top">
+          <span>—</span>
+          <span>Minimize</span>
+        </button>
+      )}
+    </div>
+  );
+
   if (!selectedTx) {
     return (
-      <div className="sidebar-panel">
-        <div className="sidebar-placeholder">
-          <div className="placeholder-icon">👁️</div>
-          <h3>Select Transaction to Inspect</h3>
-          <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-            Click any incoming transaction in the queue to inspect Indian BFSI context signals, explore the SHAP feature waterfall, and perform human-in-the-loop review.
+      <aside className="panel inspection-panel">
+        {renderHeader("Inspection Details", "Analyst Audit Panel")}
+
+        <div className="empty-state">
+          <div className="empty-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+              <line x1="13" y1="13" x2="19" y2="19" />
+            </svg>
+          </div>
+          <h3>Select Transaction</h3>
+          <p>
+            Click any incoming transaction in the queue list to inspect security explanations, view deep feature contributions, and take manual risk review decisions.
           </p>
         </div>
-      </div>
+      </aside>
     );
   }
 
@@ -136,37 +165,83 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
 
   const isPending = selectedTx.status === 'Pending';
   const showFeedback = actionFeedback || !isPending;
-  const displayFeedbackText = actionFeedback 
-    ? actionFeedback.feedback_message 
-    : (selectedTx.true_class === 1 
-        ? `Ground Truth: Verified Fraud. Analyst action logged: ${selectedTx.status}.` 
+  const displayFeedbackText = actionFeedback
+    ? actionFeedback.feedback_message
+    : (selectedTx.true_class === 1
+        ? `Ground Truth: Verified Fraud. Analyst action logged: ${selectedTx.status}.`
         : `Ground Truth: Genuine Customer. Analyst action logged: ${selectedTx.status}.`);
   const isFeedbackSuccess = actionFeedback
     ? (selectedTx.status === 'Hold' ? actionFeedback.true_class === 1 : actionFeedback.true_class === 0)
     : (selectedTx.status === 'Held' ? selectedTx.true_class === 1 : selectedTx.true_class === 0);
 
+  // Formulate concise Top-3 SHAP badges for quick explainability
+  const getShortReasonTitle = (reasonText: string) => {
+    if (reasonText.includes("Card Testing Velocity")) return "Velocity Spike Failure (60s Retries)";
+    if (reasonText.includes("Logistics Distance Anomaly")) return "Pincode Logistics Mismatch";
+    if (reasonText.includes("Regional BIN Mismatch")) return "High-risk Regional Bank BIN";
+    if (reasonText.includes("Time-Window Anomaly")) return "Night Window Anomaly";
+    if (reasonText.includes("Amount Velocity Spike")) return "Amount Velocity Baseline Spike";
+    if (reasonText.includes("Device Fingerprint")) return "Unrecognized Device Fingerprint";
+    if (reasonText.includes("Geolocation Mismatch")) return "State Geolocation Mismatch";
+    if (reasonText.includes("ticket size")) return "Elevated Ticket Size";
+    return reasonText;
+  };
+
   return (
-    <div className="sidebar-panel">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Inspection: {selectedTx.tx_id}</h2>
-          <span style={{ fontSize: '0.75rem', color: '#818cf8' }}>
-            {explanation ? explanation.persona_name : selectedTx.merchant_name}
-          </span>
-        </div>
-        <span className={`status-label ${selectedTx.status.toLowerCase()}`}>{selectedTx.status}</span>
-      </div>
+    <aside className="panel inspection-panel">
+      {renderHeader(
+        `Inspection: ${selectedTx.tx_id}`,
+        explanation ? explanation.persona_name : selectedTx.merchant_name
+      )}
 
       {loading ? (
-        <div style={{ padding: '3rem 0', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>
-          Computing Tier 2 SHAP explanation values & merchant unit economics...
+        <div style={{ padding: '3rem 0', textAlign: 'center', color: '#687386', fontSize: '13px' }}>
+          Computing Tier 2 SHAP explanation values & unit economics...
         </div>
       ) : (
-        <>
-          {/* Section: Indian BFSI Context Signals */}
+        <div className="inspection-content" style={{ marginTop: '12px' }}>
+          {/* TOP 3 SHAP REASON CODES - PROMINENT EXPLAINABILITY CARD */}
+          {explanation && (
+            <div style={{ background: 'rgba(255, 241, 218, 0.6)', padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(216, 137, 0, 0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  Top-3 SHAP Reason Codes (Explainability)
+                </span>
+                <span style={{ fontSize: '10px', color: '#b45309', fontWeight: 700 }}>
+                  p = {(selectedTx.fraud_probability * 100).toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="reasons-list">
+                {explanation.reason_codes.slice(0, 3).map((reason, i) => (
+                  <div key={i} className="reason-item" style={{ background: '#ffffff', borderLeft: '3px solid #d88900' }}>
+                    <span className="reason-bullet">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d88900" strokeWidth="2.5">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                      </svg>
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 700, color: '#1a202c', fontSize: '12px' }}>
+                        {getShortReasonTitle(reason)}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#64748b', marginTop: '1px' }}>
+                        {reason}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* BFSI CONTEXT SIGNALS */}
           <div>
-            <h3 className="section-title">Indian BFSI Context Signals</h3>
+            <h4 className="section-title">Indian BFSI Context Signals</h4>
             <div className="details-grid">
               <div className="detail-item">
                 <span className="detail-lbl">Customer ID</span>
@@ -183,80 +258,61 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
                 </span>
               </div>
               <div className="detail-item">
-                <span className="detail-lbl">Card Retries in 60s</span>
-                <span className="detail-val" style={{ color: selectedTx.card_testing_velocity_60s > 1 ? '#f87171' : '#10b981' }}>
+                <span className="detail-lbl">60s Retries</span>
+                <span className="detail-val" style={{ color: selectedTx.card_testing_velocity_60s > 1 ? '#e13737' : '#118649' }}>
                   {selectedTx.card_testing_velocity_60s} attempts
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Section: Reason Codes */}
-          {explanation && (
-            <div>
-              <h3 className="section-title">Top Risk Reason Codes</h3>
-              <div className="reasons-list">
-                {explanation.reason_codes.map((reason, i) => (
-                  <div key={i} className="reason-item">
-                    <span className="reason-bullet">⚡</span>
-                    <span>{reason}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section: Dynamic Merchant Unit Economics & Cost Matrix */}
+          {/* UNIT ECONOMICS & COST MATRIX */}
           {explanation && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="section-title" style={{ marginBottom: 0 }}>Unit Economics &amp; Expected Loss</h3>
-                <span style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>
+                <h4 className="section-title" style={{ marginBottom: 0 }}>Unit Economics & Expected Loss</h4>
+                <span style={{ fontSize: '11px', color: '#21779b', fontWeight: 700 }}>
                   p* = {(explanation.threshold * 100).toFixed(1)}%
                 </span>
               </div>
-              <div className="cost-compare-box" style={{ marginTop: '0.6rem' }}>
-                <div className={`cost-card allow ${explanation.cost_analysis.expected_loss_allow >= explanation.cost_analysis.expected_loss_block ? '' : 'better'}`}>
+
+              <div className="cost-compare-box" style={{ marginTop: '8px' }}>
+                <div className="cost-card allow">
                   <div className="cost-card-title allow">If Allowed (Pass)</div>
                   <div className="cost-card-val">
                     ₹{explanation.cost_analysis.expected_loss_allow.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
                   </div>
                   <div className="cost-card-subtext">
-                    Fraud Risk: p &times; ₹{explanation.cost_analysis.chargeback_risk_cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    Risk: p × ₹{explanation.cost_analysis.chargeback_risk_cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
-                <div className={`cost-card block ${explanation.cost_analysis.expected_loss_block > explanation.cost_analysis.expected_loss_allow ? '' : 'better'}`}>
-                  <div className="cost-card-title block">If Held (Review/Block)</div>
+                <div className="cost-card block">
+                  <div className="cost-card-title block">If Held (Block)</div>
                   <div className="cost-card-val">
                     ₹{explanation.cost_analysis.expected_loss_block.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
                   </div>
                   <div className="cost-card-subtext">
-                    Friction + Churn: (1-p) &times; ₹{explanation.cost_analysis.friction_churn_cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    Churn: (1-p) × ₹{explanation.cost_analysis.friction_churn_cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
-              </div>
-              <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: '0.5rem', fontStyle: 'italic', textAlign: 'center' }}>
-                {explanation.probability > explanation.threshold 
-                  ? "👉 Cost-Optimal Decision: HOLD (Expected Loss of Blocking < Allowing)"
-                  : "👉 Cost-Optimal Decision: ALLOW (Expected Loss of Allowing < Blocking)"}
               </div>
             </div>
           )}
 
-          {/* Section: SHAP Feature Waterfall */}
+          {/* SHAP WATERFALL */}
           {explanation && (
             <div>
-              <h3 className="section-title">SHAP Feature Contribution Waterfall</h3>
+              <h4 className="section-title">SHAP Feature Contribution Waterfall</h4>
               <div className="shap-bar-container">
                 {explanation.shap_chart_data
                   .filter(f => Math.abs(f.shap_value) > 0.05)
-                  .slice(0, 7)
+                  .slice(0, 6)
                   .map((item) => {
                     const maxVal = 2.0;
                     const widthPercent = Math.min(Math.abs(item.shap_value) / maxVal * 50, 50);
                     const isPositive = item.shap_value > 0;
-                    
+
                     return (
                       <div key={item.feature} className="shap-row">
                         <div className="shap-feat-name" title={getReadableFeatureName(item.feature)}>
@@ -280,18 +336,26 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
                     );
                   })}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#6b7280', marginTop: '0.3rem' }}>
-                <span>Genuine Signal (-SHAP)</span>
-                <span>Fraud Signal (+SHAP)</span>
-              </div>
             </div>
           )}
 
-          {/* Action buttons / Outcome feedback */}
+          {/* DECISION ACTION / FEEDBACK */}
           {showFeedback ? (
             <div className={`feedback-panel ${isFeedbackSuccess ? 'success' : 'warning'}`}>
-              <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                {isFeedbackSuccess ? '✅ Cost-Optimal Review Verdict' : '⚠️ Non-Optimal Review Verdict'}
+              <div style={{ fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {isFeedbackSuccess ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                )}
+                {isFeedbackSuccess ? 'Cost-Optimal Review Verdict' : 'Non-Optimal Review Verdict'}
               </div>
               <div>{displayFeedbackText}</div>
             </div>
@@ -313,8 +377,8 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
-    </div>
+    </aside>
   );
 };

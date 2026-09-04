@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI(
-    title="Razorpay Buildathon — AI Risk Manager API",
+    title="Razorpay buildathon- Lossfunction API",
     description="Cost-Optimized Two-Tier Fraud Risk Scorer with Defense-Only Security Boundary"
 )
 

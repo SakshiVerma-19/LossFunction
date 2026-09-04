@@ -36,128 +36,142 @@ interface QueueProps {
   transactions: Transaction[];
   selectedTxId: string | null;
   onSelectTx: (tx: Transaction) => void;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
 }
 
 export const TransactionQueue: React.FC<QueueProps> = ({
   transactions,
   selectedTxId,
-  onSelectTx
+  onSelectTx,
+  isMinimized = false,
+  onToggleMinimize
 }) => {
   const [filterAction, setFilterAction] = useState<string>('ALL');
-  const [filterTriage, setFilterTriage] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  if (isMinimized) return null;
 
   const filteredTransactions = transactions.filter((tx) => {
     const matchesAction =
       filterAction === 'ALL' || tx.suggested_action.toUpperCase() === filterAction;
-    const matchesTriage =
-      filterTriage === 'ALL' ||
-      (filterTriage === 'FAST_PASS' && tx.tier1_triage.includes('Fast-Path Pass')) ||
-      (filterTriage === 'DEEP_QUEUE' && tx.tier1_triage.includes('Deep Queue')) ||
-      (filterTriage === 'FAST_FLAG' && tx.tier1_triage.includes('Fast-Path Flag'));
+    const matchesStatus =
+      filterStatus === 'ALL' || tx.status.toUpperCase() === filterStatus;
     const matchesSearch =
       tx.tx_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.customer_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.card_bank.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.merchant_name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesAction && matchesTriage && matchesSearch;
+
+    return matchesAction && matchesStatus && matchesSearch;
   });
 
+  const getProfileType = (tx: Transaction) => {
+    if (tx.fraud_probability > 0.7) return 'Suspicious';
+    if (tx.card_testing_velocity_60s > 1) return 'New User';
+    if (tx.amount > 40000) return 'Premium';
+    return 'Standard';
+  };
+
+  const getCostString = (tx: Transaction) => {
+    const costVal = (tx.amount * tx.fraud_probability * 0.05).toFixed(2);
+    const tier = tx.fraud_probability > 0.6 ? 'high' : tx.fraud_probability > 0.3 ? 'med' : 'low';
+    return `₹${costVal} / ${tier}`;
+  };
+
   return (
-    <div className="queue-panel">
-      <div className="panel-header">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <div className="panel-title">🛡️ Live CNP Transaction Stream (Advisory Review Queue)</div>
-          <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-            Triaged via Two-Tier Engine: <strong>{filteredTransactions.length}</strong> transactions in active view
-          </span>
+    <div className="panel">
+      {/* QUEUE HEADER */}
+      <div className="queue-header">
+        <div className="queue-title">
+          <h2>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#21779b" strokeWidth="2.2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Incoming Transaction Queue
+          </h2>
+          <p>Showing {filteredTransactions.length} of {transactions.length} real-time transactions</p>
         </div>
-        
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="Search TXN, Bank, Pincode..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              padding: '0.35rem 0.6rem',
-              color: 'white',
-              fontSize: '0.8rem',
-              outline: 'none',
-              width: '180px'
-            }}
-          />
-          
+
+        <div className="filters">
+          <div className="search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search TXN, Customer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <select
-            value={filterTriage}
-            onChange={(e) => setFilterTriage(e.target.value)}
-            style={{
-              background: '#111827',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              padding: '0.35rem 0.5rem',
-              color: 'white',
-              fontSize: '0.8rem',
-              outline: 'none'
-            }}
+            className="filter-select"
+            value={filterAction}
+            onChange={(e) => setFilterAction(e.target.value)}
           >
-            <option value="ALL">All Triage Paths</option>
-            <option value="DEEP_QUEUE">Tier 2 Deep Queue</option>
-            <option value="FAST_FLAG">Tier 1 Fast Flag</option>
-            <option value="FAST_PASS">Tier 1 Fast Pass</option>
+            <option value="ALL">All Actions</option>
+            <option value="ALLOW">Allow (Pass)</option>
+            <option value="HOLD">Hold (Flag)</option>
+            <option value="REVIEW">Review (Gray)</option>
           </select>
 
           <select
-            value={filterAction}
-            onChange={(e) => setFilterAction(e.target.value)}
-            style={{
-              background: '#111827',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              padding: '0.35rem 0.5rem',
-              color: 'white',
-              fontSize: '0.8rem',
-              outline: 'none'
-            }}
+            className="filter-select"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
           >
-            <option value="ALL">All Suggestions</option>
-            <option value="HOLD">Hold (p &gt; p*)</option>
-            <option value="REVIEW">Review (p ≈ p*)</option>
-            <option value="ALLOW">Allow (Safe)</option>
+            <option value="ALL">All Statuses</option>
+            <option value="ALLOWED">Approved</option>
+            <option value="HELD">Flagged</option>
+            <option value="PENDING">Pending</option>
           </select>
+
+          {onToggleMinimize && (
+            <button className="minimize-btn" onClick={onToggleMinimize} title="Minimize Queue tab to top">
+              <span>—</span>
+              <span>Minimize</span>
+            </button>
+          )}
         </div>
       </div>
-      
-      <div className="table-container">
-        <table className="transaction-table">
+
+      {/* DATA TABLE */}
+      <div className="table-wrapper">
+        <table>
           <thead>
             <tr>
-              <th>TX ID & Triage</th>
-              <th>Customer & Route</th>
-              <th>Card / Regional BIN</th>
-              <th>Amount (INR)</th>
-              <th style={{ textAlign: 'right' }}>Fraud Prob</th>
-              <th style={{ textAlign: 'right' }}>Threshold (p*)</th>
-              <th style={{ textAlign: 'center' }}>Cost Suggested</th>
-              <th style={{ textAlign: 'center' }}>Review Status</th>
+              <th>ID</th>
+              <th>CUSTOMER</th>
+              <th>MERCHANT (MCC)</th>
+              <th>AMOUNT (INR)</th>
+              <th>FISCAL PROFILE</th>
+              <th>THRESHOLD %</th>
+              <th>COST SUGGESTED</th>
+              <th>REVIEW STATUS</th>
             </tr>
           </thead>
+
           <tbody>
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                  No transactions match current filters.
+                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#687386' }}>
+                  No incoming transactions match current filters.
                 </td>
               </tr>
             ) : (
               filteredTransactions.map((tx) => {
                 const isSelected = selectedTxId === tx.tx_id;
-                const isRural = tx.bin_regional_tier === 'rural_regional' || tx.bin_regional_tier === 'coop_urban';
-                const hasCardTesting = tx.card_testing_velocity_60s > 1;
+                const statusClass =
+                  tx.status === 'Allowed' ? 'approved' :
+                  tx.status === 'Held' ? 'flagged' : 'pending';
+                const statusLabel =
+                  tx.status === 'Allowed' ? 'Approved' :
+                  tx.status === 'Held' ? 'Flagged' : 'Pending';
+
                 const isPincodeMismatch = tx.billing_pincode !== tx.shipping_pincode;
 
                 return (
@@ -166,68 +180,51 @@ export const TransactionQueue: React.FC<QueueProps> = ({
                     className={isSelected ? 'selected' : ''}
                     onClick={() => onSelectTx(tx)}
                   >
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <span style={{ fontWeight: '600', color: isSelected ? '#a855f7' : '#f3f4f6' }}>{tx.tx_id}</span>
-                        <span className={`triage-badge ${
-                          tx.tier1_triage.includes('Fast-Path Pass') ? 'pass' :
-                          tx.tier1_triage.includes('Fast-Path Flag') ? 'flag' : 'queue'
-                        }`}>
-                          {tx.tier1_triage.includes('Fast-Path Pass') ? '⚡ Fast-Pass (<20ms)' :
-                           tx.tier1_triage.includes('Fast-Path Flag') ? '🚨 Fast-Flag' : '📥 Deep Queue'}
-                        </span>
-                      </div>
+                    <td className="transaction-id">
+                      {tx.tx_id}
                     </td>
 
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span>{tx.customer_id}</span>
-                        <span style={{ fontSize: '0.7rem', color: isPincodeMismatch ? '#f59e0b' : '#9ca3af' }}>
-                          PIN: {tx.billing_pincode} → {tx.shipping_pincode} {isPincodeMismatch && '⚠️'}
+                        <span style={{ fontSize: '11px', color: '#687386', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {tx.card_bank}
+                          {isPincodeMismatch && (
+                            <span title="Pincode Mismatch" style={{ color: '#d88900', display: 'inline-flex' }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                              </svg>
+                            </span>
+                          )}
                         </span>
                       </div>
                     </td>
 
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                        <span>{tx.card_bank}</span>
-                        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>BIN: {tx.card_bin}</span>
-                          {isRural && (
-                            <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '0.1rem 0.3rem', borderRadius: '3px' }}>
-                              Regional/Co-op
-                            </span>
-                          )}
-                          {hasCardTesting && (
-                            <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.1rem 0.3rem', borderRadius: '3px' }}>
-                              ⚡ {tx.card_testing_velocity_60s} retries/60s
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    <td className="merchant">
+                      {tx.merchant_name} ({tx.mcc})
                     </td>
 
-                    <td style={{ fontWeight: '600' }}>
+                    <td className="amount">
                       ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
 
-                    <td style={{ textAlign: 'right', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                      {(tx.fraud_probability * 100).toFixed(1)}%
+                    <td className="profile-type">
+                      {getProfileType(tx)}
                     </td>
 
-                    <td style={{ textAlign: 'right', color: '#9ca3af', fontFamily: 'monospace' }}>
+                    <td className="threshold">
                       {(tx.cost_optimal_threshold * 100).toFixed(1)}%
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${tx.suggested_action.toLowerCase()}`}>
-                        {tx.suggested_action}
-                      </span>
+                    <td className="cost">
+                      {getCostString(tx)}
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
-                      <span className={`status-label ${tx.status.toLowerCase()}`}>
-                        {tx.status}
+                    <td>
+                      <span className={`badge ${statusClass}`}>
+                        {statusLabel}
                       </span>
                     </td>
                   </tr>
