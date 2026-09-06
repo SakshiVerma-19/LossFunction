@@ -1,4 +1,4 @@
-# Razorpay buildathon- Lossfunction
+# Razorpay Buildathon — LossFunction
 ## Transaction Fraud Risk Scorer with Cost-Optimized Decisioning & Two-Tier Architecture
 
 [![Defense-Only Security Boundary](https://img.shields.io/badge/Security-Strictly%20Defense--Only-emerald.svg)](#defense-only-security-boundary)
@@ -163,7 +163,7 @@ Open **http://localhost:5173** in your browser to interact with the Ops Review D
 ## 8. Repository Structure
 
 ```
-riskmanager/
+LossFunction/
 ├── backend/
 │   ├── data_pipeline.py       # Validation & Stress-Testing Suite (Indian BFSI features)
 │   ├── model_pipeline.py      # Two-Tier Training (Tier 1 LightGBM + Tier 2 XGBoost/SHAP)
