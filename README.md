@@ -7,6 +7,9 @@
 
 ---
 
+> 📖 **Deep Dive**: For a comprehensive breakdown of functionality, features, technical stack, and system limitations, see [PROJECT_DETAILS.md](./PROJECT_DETAILS.md).
+
+---
 ## 1. Problem Statement
 
 Merchants on payment gateways frequently lose margin to card-not-present (CNP) transaction fraud that surfaces weeks later as chargebacks. 
@@ -21,7 +24,7 @@ A **Two-Tier Transaction Fraud Risk Scorer** that operates within strict payment
 
 ## 2. Strict Defense-Only Security Boundary
 
-> ### 🛡️ Explicit Security Boundary Declaration
+> ### Explicit Security Boundary Declaration
 > **Read-Only Advisory Scoring Pipeline:**
 > - The system consumes transaction payloads and emits risk scores, cost-minimizing recommendations, and SHAP explainability reason codes.
 > - **Zero Offensive Capabilities**: The system contains **zero egress API routes** capable of autonomously triggering payment blocks, account bans, card network retaliations, or merchant fund freezes.
@@ -47,7 +50,7 @@ Real payment gateways cannot afford 500ms deep tree traversals and SHAP evaluati
                ▼                ▼                ▼
        p < 0.20           0.20 <= p < 0.85     p >= 0.85
   ┌──────────────────┐  ┌───────────────────┐ ┌──────────────────┐
-  │ ⚡ Fast-Path Pass │  │ 📥 Tier 2 Async   │ │ 🚨 Fast-Path Flag│
+  │   Fast-Path Pass │  │    Tier 2 Async   │ │   Fast-Path Flag │
   │  (Auto-Approve)  │  │    Deep Queue     │ │  (High Priority) │
   └──────────────────┘  └─────────┬─────────┘ └────────┬─────────┘
                                   │                    │
@@ -61,7 +64,7 @@ Real payment gateways cannot afford 500ms deep tree traversals and SHAP evaluati
                                   │
                                   ▼
          ┌────────────────────────────────────────────────────────┐
-         │ 🛡️ Human-in-the-Loop Risk Ops Review Dashboard          │
+         │   Human-in-the-Loop Risk Ops Review Dashboard          │
          │    (Analyst Overrides, Reason Codes & Unit Economics)  │
          └────────────────────────────────────────────────────────┘
 ```
@@ -104,10 +107,10 @@ $$p^*(A_i, k) = \frac{\text{Cost}_{\text{FP}}(A_i, k)}{\text{Cost}_{\text{FN}}(A
 
 | Persona | Ticket Size | Gross Margin ($m$) | Churn Loss ($C_{\text{churn}}$) | Optimal Threshold ($p^*$) | Economic Rationale |
 |---|---|---|---|---|---|
-| **💻 Digital SaaS & Subscriptions** | ₹199 – ₹1,499 | 85% | **₹3,000** | **`69.3%`** | Friction destroys high recurring customer LTV; pass borderline cases. |
-| **📱 High-Value Electronics** | ₹18,000 – ₹75,000 | 8% | **₹800** | **`9.2%`** | 100% physical inventory loss on thin margin; hold aggressively. |
-| **⚡ Quick Commerce & Food** | ₹180 – ₹1,800 | 15% | **₹1,500** | **`45.7%`** | False alarms drive users to competitor apps (Swiggy/Zepto). |
-| **🎮 Gaming & Digital Assets** | ₹1,200 – ₹28,000 | 70% | **₹600** | **`39.1%`** | Instant liquidity cash-out with ₹2,400 dispute penalties. |
+| **Digital SaaS & Subscriptions** | ₹199 – ₹1,499 | 85% | **₹3,000** | **`69.3%`** | Friction destroys high recurring customer LTV; pass borderline cases. |
+| **High-Value Electronics** | ₹18,000 – ₹75,000 | 8% | **₹800** | **`9.2%`** | 100% physical inventory loss on thin margin; hold aggressively. |
+| **Quick Commerce & Food** | ₹180 – ₹1,800 | 15% | **₹1,500** | **`45.7%`** | False alarms drive users to competitor apps (Swiggy/Zepto). |
+| **Gaming & Digital Assets** | ₹1,200 – ₹28,000 | 70% | **₹600** | **`39.1%`** | Instant liquidity cash-out with ₹2,400 dispute penalties. |
 
 ---
 
