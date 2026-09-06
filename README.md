@@ -1,4 +1,4 @@
-# Razorpay Buildathon — AI Risk Manager
+# Razorpay Buildathon — LossFunction
 ## Transaction Fraud Risk Scorer with Cost-Optimized Decisioning & Two-Tier Architecture
 
 [![Defense-Only Security Boundary](https://img.shields.io/badge/Security-Strictly%20Defense--Only-emerald.svg)](#defense-only-security-boundary)
