@@ -5,6 +5,11 @@ This module generates realistic Indian BFSI payment signals layered on top of
 public ground-truth card transaction data for model validation, threshold calibration,
 and ops review queue stress-testing.
 
+Payment Methods Supported:
+- Card (Credit / Debit): BIN-level, regional bank anomalies, card-testing velocity.
+- UPI: VPA (Virtual Payment Address), 60-second attempt velocity, VPA account age.
+- Net-Banking: IFSC code, hashed account identifier, session risk score.
+
 Security Boundary:
 - Consumes transaction payloads and emits structured risk signals.
 - Contains zero offensive code, zero automated block endpoints, and zero payout triggers.
@@ -228,6 +233,87 @@ def generate_validation_bfsi_features(raw_csv_path):
     for idx in fraud_idx:
         df.loc[idx, 'velocity_1h'] += np.random.randint(2, 5)
         
+    # ── 10. Payment Method Overlay ────────────────────────────────────────────
+    # Assign payment method: genuine skews card/UPI; fraud skews UPI (high velocity)
+    pm_options = ["card", "upi", "netbanking"]
+    pm_probs_gen   = [0.50, 0.35, 0.15]
+    pm_probs_fraud = [0.30, 0.55, 0.15]   # Fraud prefers UPI (instant, harder to reverse)
+
+    df['payment_method'] = ""
+    df.loc[gen_idx,   'payment_method'] = np.random.choice(pm_options, size=len(gen_idx),   p=pm_probs_gen)
+    df.loc[fraud_idx, 'payment_method'] = np.random.choice(pm_options, size=len(fraud_idx), p=pm_probs_fraud)
+
+    # ── UPI signals ──────────────────────────────────────────────────────────
+    upi_banks    = ["okicici", "oksbi", "okhdfc", "okaxis", "ybl", "paytm", "upi"]
+    upi_gen_idx   = df[df['payment_method'] == 'upi'].index.intersection(gen_idx)
+    upi_fraud_idx = df[df['payment_method'] == 'upi'].index.intersection(fraud_idx)
+
+    # VPA — e.g. cust1234@okicici
+    df['vpa'] = None
+    df.loc[upi_gen_idx,   'vpa'] = [
+        f"{cid.lower().replace('_', '')}@{np.random.choice(upi_banks)}"
+        for cid in df.loc[upi_gen_idx, 'customer_id']
+    ]
+    df.loc[upi_fraud_idx, 'vpa'] = [
+        # Fraud often uses randomly generated / disposable VPAs
+        f"usr{hashlib.md5(str(idx).encode()).hexdigest()[:6]}@{np.random.choice(upi_banks)}"
+        for idx in upi_fraud_idx
+    ]
+
+    # UPI velocity in last 60 seconds
+    df['upi_velocity_60s'] = 0
+    df.loc[upi_gen_idx,   'upi_velocity_60s'] = np.random.choice([0, 1],          size=len(upi_gen_idx),   p=[0.92, 0.08])
+    df.loc[upi_fraud_idx, 'upi_velocity_60s'] = np.random.choice([1, 2, 3, 4, 5], size=len(upi_fraud_idx), p=[0.10, 0.25, 0.30, 0.20, 0.15])
+
+    # VPA account age in days (new accounts are riskier)
+    df['vpa_age_days'] = 0
+    df.loc[upi_gen_idx,   'vpa_age_days'] = np.random.randint(180, 1800, size=len(upi_gen_idx))
+    df.loc[upi_fraud_idx, 'vpa_age_days'] = np.random.randint(0,   60,   size=len(upi_fraud_idx))  # Fraud = fresh VPA
+
+    # ── Net-Banking signals ───────────────────────────────────────────────────
+    ifsc_prefixes = ["HDFC", "SBIN", "ICIC", "UTIB", "PUNB", "BARB", "CNRB"]
+    nb_gen_idx   = df[df['payment_method'] == 'netbanking'].index.intersection(gen_idx)
+    nb_fraud_idx = df[df['payment_method'] == 'netbanking'].index.intersection(fraud_idx)
+
+    df['ifsc_code'] = None
+    df.loc[nb_gen_idx,   'ifsc_code'] = [
+        f"{np.random.choice(ifsc_prefixes)}0{np.random.randint(100000, 999999)}"
+        for _ in range(len(nb_gen_idx))
+    ]
+    df.loc[nb_fraud_idx, 'ifsc_code'] = [
+        f"{np.random.choice(ifsc_prefixes)}0{np.random.randint(100000, 999999)}"
+        for _ in range(len(nb_fraud_idx))
+    ]
+
+    # Hashed bank account number (never store raw account numbers)
+    df['bank_account_hash'] = df.apply(
+        lambda row: hashlib.sha256(
+            f"{row['customer_id']}_{row.get('ifsc_code', '')}".encode()
+        ).hexdigest()[:12]
+        if row['payment_method'] == 'netbanking' else None,
+        axis=1
+    )
+
+    # Net-banking session risk: genuine sessions are low risk; fraud sessions show anomaly
+    df['netbanking_session_risk'] = 0.0
+    df.loc[nb_gen_idx,   'netbanking_session_risk'] = np.random.uniform(0.01, 0.15, size=len(nb_gen_idx))
+    df.loc[nb_fraud_idx, 'netbanking_session_risk'] = np.random.uniform(0.60, 0.98, size=len(nb_fraud_idx))
+
+    # ── Composite payment method risk score (numeric signal for model) ────────
+    # card: baseline; upi: depends on velocity & VPA age; netbanking: session risk
+    def compute_pm_risk(row):
+        pm = row['payment_method']
+        if pm == 'card':
+            return float(row['bin_regional_risk'])
+        elif pm == 'upi':
+            vel_risk = min(row['upi_velocity_60s'] * 0.12, 0.60)
+            age_risk = max(0.0, 1.0 - row['vpa_age_days'] / 365.0) * 0.35
+            return round(min(vel_risk + age_risk, 0.95), 4)
+        else:  # netbanking
+            return float(row['netbanking_session_risk'])
+
+    df['payment_method_risk'] = df.apply(compute_pm_risk, axis=1)
+
     processed_csv_path = os.path.join(os.path.dirname(raw_csv_path), 'processed_transactions.csv')
     df.to_csv(processed_csv_path, index=False)
     print(f"Validation & Stress-Testing dataset generated successfully at: {processed_csv_path}")

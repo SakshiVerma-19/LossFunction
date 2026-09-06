@@ -157,7 +157,12 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
       'ip_mismatch': 'State Geolocation Mismatch',
       'velocity_1h': '1-Hour Customer Velocity',
       'hour_ist': 'Hour of Day (IST)',
-      'mcc_fraud_rate': 'Merchant MCC Risk'
+      'mcc_fraud_rate': 'Merchant MCC Risk',
+      // Payment method signals
+      'payment_method_risk': 'Payment Method Composite Risk',
+      'upi_velocity_60s': 'UPI Attempt Velocity (60s)',
+      'vpa_age_days': 'VPA Account Age (days)',
+      'netbanking_session_risk': 'Net-Banking Session Risk',
     };
     if (name.startsWith('V')) return `PCA Pattern Signal (${name})`;
     return maps[name] || name;
@@ -178,6 +183,10 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
   // Formulate concise Top-3 SHAP badges for quick explainability
   const getShortReasonTitle = (reasonText: string) => {
     if (reasonText.includes("Card Testing Velocity")) return "Velocity Spike Failure (60s Retries)";
+    if (reasonText.includes("UPI High Velocity")) return "UPI Rapid-Fire Velocity Spike";
+    if (reasonText.includes("Net-Banking Session Anomaly")) return "Net-Banking Session Risk";
+    if (reasonText.includes("Payment Method Risk Elevated")) return "High-Risk Payment Channel";
+    if (reasonText.includes("New UPI VPA")) return "Disposable VPA Detected";
     if (reasonText.includes("Logistics Distance Anomaly")) return "Pincode Logistics Mismatch";
     if (reasonText.includes("Regional BIN Mismatch")) return "High-risk Regional Bank BIN";
     if (reasonText.includes("Time-Window Anomaly")) return "Night Window Anomaly";
@@ -248,20 +257,71 @@ export const AnalystSidebar: React.FC<SidebarProps> = ({
                 <span className="detail-lbl">Customer ID</span>
                 <span className="detail-val">{selectedTx.customer_id}</span>
               </div>
-              <div className="detail-item">
-                <span className="detail-lbl">Card / Regional BIN</span>
-                <span className="detail-val">{selectedTx.card_bank} ({selectedTx.card_bin})</span>
-              </div>
+
+              {/* Payment Method adaptive section */}
+              {selectedTx.payment_method === 'upi' ? (
+                <>
+                  <div className="detail-item">
+                    <span className="detail-lbl">Payment Method</span>
+                    <span className="detail-val" style={{ color: '#7c3aed', fontWeight: 700 }}>UPI</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">VPA (Handle)</span>
+                    <span className="detail-val">{selectedTx.vpa ?? '—'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">UPI Velocity (60s)</span>
+                    <span className="detail-val" style={{ color: selectedTx.upi_velocity_60s > 1 ? '#e13737' : '#118649' }}>
+                      {selectedTx.upi_velocity_60s} attempts
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">VPA Age</span>
+                    <span className="detail-val" style={{ color: selectedTx.vpa_age_days < 30 ? '#e13737' : '#118649' }}>
+                      {selectedTx.vpa_age_days} days
+                    </span>
+                  </div>
+                </>
+              ) : selectedTx.payment_method === 'netbanking' ? (
+                <>
+                  <div className="detail-item">
+                    <span className="detail-lbl">Payment Method</span>
+                    <span className="detail-val" style={{ color: '#0d7a55', fontWeight: 700 }}>Net-Banking</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">IFSC Code</span>
+                    <span className="detail-val">{selectedTx.ifsc_code ?? '—'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">Session Risk</span>
+                    <span className="detail-val" style={{ color: (selectedTx.netbanking_session_risk ?? 0) > 0.5 ? '#e13737' : '#118649' }}>
+                      {((selectedTx.netbanking_session_risk ?? 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="detail-item">
+                    <span className="detail-lbl">Payment Method</span>
+                    <span className="detail-val" style={{ color: '#21779b', fontWeight: 700 }}>Card</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">Card / Regional BIN</span>
+                    <span className="detail-val">{selectedTx.card_bank} ({selectedTx.card_bin})</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-lbl">60s Retries</span>
+                    <span className="detail-val" style={{ color: selectedTx.card_testing_velocity_60s > 1 ? '#e13737' : '#118649' }}>
+                      {selectedTx.card_testing_velocity_60s} attempts
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div className="detail-item">
                 <span className="detail-lbl">Logistics Route</span>
                 <span className="detail-val">
                   {selectedTx.billing_pincode} → {selectedTx.shipping_pincode}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-lbl">60s Retries</span>
-                <span className="detail-val" style={{ color: selectedTx.card_testing_velocity_60s > 1 ? '#e13737' : '#118649' }}>
-                  {selectedTx.card_testing_velocity_60s} attempts
                 </span>
               </div>
             </div>

@@ -64,7 +64,10 @@ def train_and_evaluate_two_tier():
         'velocity_1h',
         'card_testing_velocity_60s',
         'mcc_fraud_rate',
-        'bin_regional_risk'
+        'bin_regional_risk',
+        # Payment method signals
+        'payment_method_risk',
+        'upi_velocity_60s',
     ]
     
     # Tier 2 Deep Features (Full feature set including PCA and cross-logistics anomalies)
@@ -80,7 +83,12 @@ def train_and_evaluate_two_tier():
         'ip_mismatch',
         'velocity_1h',
         'hour_ist',
-        'mcc_fraud_rate'
+        'mcc_fraud_rate',
+        # Payment method signals
+        'payment_method_risk',
+        'upi_velocity_60s',
+        'vpa_age_days',
+        'netbanking_session_risk',
     ]
     
     X_train_t1 = train_df[tier1_features]
@@ -338,6 +346,9 @@ def train_and_evaluate_two_tier():
         'amount_scaled', 'billing_pincode', 'shipping_pincode', 'pincode_distance_risk',
         'card_testing_velocity_60s', 'device_mismatch', 'ip_mismatch', 'state', 
         'hour_ist', 'time_mcc_anomaly', 'velocity_1h', 'amount_vs_historical_ratio',
+        # Payment method columns
+        'payment_method', 'vpa', 'upi_velocity_60s', 'vpa_age_days',
+        'ifsc_code', 'bank_account_hash', 'netbanking_session_risk', 'payment_method_risk',
         'tier1_score', 'tier1_triage', 'fraud_probability', 'cost_optimal_threshold'
     ]
     test_df[save_cols].to_csv(os.path.join(data_dir, 'test_predictions.csv'), index=False)

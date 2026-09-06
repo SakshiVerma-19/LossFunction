@@ -6,7 +6,9 @@
         "velocity_1h",
         "card_testing_velocity_60s",
         "mcc_fraud_rate",
-        "bin_regional_risk"
+        "bin_regional_risk",
+        "payment_method_risk",
+        "upi_velocity_60s"
     ],
     "tier2_features": [
         "V1",
@@ -47,7 +49,11 @@
         "ip_mismatch",
         "velocity_1h",
         "hour_ist",
-        "mcc_fraud_rate"
+        "mcc_fraud_rate",
+        "payment_method_risk",
+        "upi_velocity_60s",
+        "vpa_age_days",
+        "netbanking_session_risk"
     ],
     "mcc_encoding": {
         "5732": 0.009007223555288942,

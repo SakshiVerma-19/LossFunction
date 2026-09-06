@@ -78,6 +78,7 @@ class ActionRequest(BaseModel):
 class LiveScoreRequest(BaseModel):
     amount: float
     merchant_persona: str = "digital_saas"
+    # Card fields
     card_bin: str = "451123"
     billing_pincode: str = "400001"
     shipping_pincode: str = "400001"
@@ -86,6 +87,15 @@ class LiveScoreRequest(BaseModel):
     ip_mismatch: int = 0
     hour_ist: int = 14
     velocity_1h: int = 1
+    # Payment method — card | upi | netbanking
+    payment_method: str = "card"
+    # UPI-specific (optional, relevant when payment_method == "upi")
+    vpa: Optional[str] = None
+    upi_velocity_60s: int = 0
+    vpa_age_days: int = 365
+    # Net-Banking-specific (optional, relevant when payment_method == "netbanking")
+    ifsc_code: Optional[str] = None
+    netbanking_session_risk: float = 0.0
 
 @app.get("/api/transactions")
 def get_transactions(
@@ -153,6 +163,16 @@ def get_transactions(
             "hour_ist": int(row['hour_ist']),
             "time_mcc_anomaly": int(row['time_mcc_anomaly']),
             "amount_vs_historical_ratio": float(row['amount_vs_historical_ratio']),
+            # Payment method fields
+            "payment_method": str(row.get('payment_method', 'card')),
+            "vpa": str(row['vpa']) if pd.notna(row.get('vpa')) else None,
+            "upi_velocity_60s": int(row.get('upi_velocity_60s', 0)),
+            "vpa_age_days": int(row.get('vpa_age_days', 0)),
+            "ifsc_code": str(row['ifsc_code']) if pd.notna(row.get('ifsc_code')) else None,
+            "bank_account_hash": str(row['bank_account_hash']) if pd.notna(row.get('bank_account_hash')) else None,
+            "netbanking_session_risk": float(row.get('netbanking_session_risk', 0.0)),
+            "payment_method_risk": float(row.get('payment_method_risk', 0.0)),
+            # Scoring fields
             "tier1_score": float(row['tier1_score']),
             "tier1_triage": row['tier1_triage'],
             "fraud_probability": prob,
@@ -264,6 +284,14 @@ def get_explanation(tx_id: str, persona: Optional[str] = Query(None)):
         
         if f == "card_testing_velocity_60s" and v > 0:
             reason_codes.append(f"Card Testing Velocity: {int(v)} rapid authentication failures within 60s")
+        elif f == "upi_velocity_60s" and v > 1:
+            reason_codes.append(f"UPI High Velocity: {int(v)} UPI payment attempts within 60 seconds — possible account takeover")
+        elif f == "netbanking_session_risk" and v > 0.5:
+            reason_codes.append(f"Net-Banking Session Anomaly: Session risk score {v:.2f} — suspicious login or credential reuse detected")
+        elif f == "payment_method_risk" and v > 0.4:
+            reason_codes.append(f"Payment Method Risk Elevated: Composite method risk {v:.2f} — high-risk payment channel detected")
+        elif f == "vpa_age_days" and v < 30:
+            reason_codes.append(f"New UPI VPA: VPA account is only {int(v)} day(s) old — disposable VPA pattern detected")
         elif f == "pincode_distance_risk" and v > 0.5:
             reason_codes.append(f"Logistics Distance Anomaly: High risk delivery mismatch ({row['billing_pincode']} -> {row['shipping_pincode']})")
         elif f == "bin_regional_risk" and v > 0.05:
@@ -376,7 +404,16 @@ def score_live_transaction(payload: LiveScoreRequest):
     
     # Tier 1 Instant Evaluation
     time.sleep(0.003) # 3ms simulated feature extraction
-    tier1_score = 0.12 if payload.card_testing_velocity_60s == 0 and payload.amount < 5000 else 0.88
+
+    # Compute a composite velocity signal across all payment methods
+    effective_velocity = payload.card_testing_velocity_60s
+    if payload.payment_method == "upi":
+        effective_velocity = max(effective_velocity, payload.upi_velocity_60s)
+    elif payload.payment_method == "netbanking":
+        # High session risk counts as a velocity signal
+        effective_velocity = max(effective_velocity, 2 if payload.netbanking_session_risk > 0.6 else 0)
+
+    tier1_score = 0.12 if effective_velocity == 0 and payload.amount < 5000 else 0.88
     t1_latency_ms = (time.time() - t_start) * 1000
     
     if tier1_score < 0.20:

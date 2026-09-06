@@ -23,6 +23,16 @@ export interface Transaction {
   hour_ist: number;
   time_mcc_anomaly: number;
   amount_vs_historical_ratio: number;
+  // Payment method fields
+  payment_method: 'card' | 'upi' | 'netbanking';
+  vpa: string | null;
+  upi_velocity_60s: number;
+  vpa_age_days: number;
+  ifsc_code: string | null;
+  bank_account_hash: string | null;
+  netbanking_session_risk: number;
+  payment_method_risk: number;
+  // Scoring
   tier1_score: number;
   tier1_triage: string;
   fraud_probability: number;
@@ -65,16 +75,48 @@ export const TransactionQueue: React.FC<QueueProps> = ({
       tx.tx_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.customer_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.card_bank.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.merchant_name.toLowerCase().includes(searchTerm.toLowerCase());
+      tx.merchant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tx.vpa ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tx.ifsc_code ?? '').toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesAction && matchesStatus && matchesSearch;
   });
 
   const getProfileType = (tx: Transaction) => {
     if (tx.fraud_probability > 0.7) return 'Suspicious';
-    if (tx.card_testing_velocity_60s > 1) return 'New User';
+    if (tx.payment_method === 'upi' && tx.upi_velocity_60s > 1) return 'UPI Velocity';
+    if (tx.card_testing_velocity_60s > 1) return 'Card Testing';
     if (tx.amount > 40000) return 'Premium';
     return 'Standard';
+  };
+
+  const getPaymentMethodBadge = (tx: Transaction) => {
+    switch (tx.payment_method) {
+      case 'upi':
+        return {
+          label: 'UPI',
+          color: '#7c3aed',
+          bg: 'rgba(124,58,237,0.12)',
+          border: 'rgba(124,58,237,0.35)',
+          sub: tx.vpa ? (tx.vpa.length > 22 ? tx.vpa.slice(0, 20) + '…' : tx.vpa) : null,
+        };
+      case 'netbanking':
+        return {
+          label: 'Net-Banking',
+          color: '#0d7a55',
+          bg: 'rgba(13,122,85,0.10)',
+          border: 'rgba(13,122,85,0.30)',
+          sub: tx.ifsc_code ?? null,
+        };
+      default:
+        return {
+          label: 'Card',
+          color: '#21779b',
+          bg: 'rgba(33,119,155,0.10)',
+          border: 'rgba(33,119,155,0.25)',
+          sub: tx.card_bank,
+        };
+    }
   };
 
   const getCostString = (tx: Transaction) => {
@@ -150,6 +192,7 @@ export const TransactionQueue: React.FC<QueueProps> = ({
               <th>ID</th>
               <th>CUSTOMER</th>
               <th>MERCHANT (MCC)</th>
+              <th>PAYMENT</th>
               <th>AMOUNT (INR)</th>
               <th>FISCAL PROFILE</th>
               <th>THRESHOLD %</th>
@@ -161,7 +204,7 @@ export const TransactionQueue: React.FC<QueueProps> = ({
           <tbody>
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#687386' }}>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#687386' }}>
                   No incoming transactions match current filters.
                 </td>
               </tr>
@@ -190,7 +233,6 @@ export const TransactionQueue: React.FC<QueueProps> = ({
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span>{tx.customer_id}</span>
                         <span style={{ fontSize: '11px', color: '#687386', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          {tx.card_bank}
                           {isPincodeMismatch && (
                             <span title="Pincode Mismatch" style={{ color: '#d88900', display: 'inline-flex' }}>
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -198,6 +240,7 @@ export const TransactionQueue: React.FC<QueueProps> = ({
                                 <line x1="12" y1="8" x2="12" y2="12" />
                                 <line x1="12" y1="16" x2="12.01" y2="16" />
                               </svg>
+                              Pincode mismatch
                             </span>
                           )}
                         </span>
@@ -206,6 +249,35 @@ export const TransactionQueue: React.FC<QueueProps> = ({
 
                     <td className="merchant">
                       {tx.merchant_name} ({tx.mcc})
+                    </td>
+
+                    {/* PAYMENT METHOD COLUMN */}
+                    <td>
+                      {(() => {
+                        const pm = getPaymentMethodBadge(tx);
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: pm.color,
+                              background: pm.bg,
+                              border: `1px solid ${pm.border}`,
+                              letterSpacing: '0.3px',
+                            }}>
+                              {pm.label}
+                            </span>
+                            {pm.sub && (
+                              <span style={{ fontSize: '10px', color: '#687386', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {pm.sub}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td className="amount">

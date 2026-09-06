@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# ── Generated data & model artifacts (large files, regenerated locally) ──
+data/creditcard.csv
+data/processed_transactions.csv
+data/test_predictions.csv
+data/test_shap_values.npy
+data/shap_explainer.pkl
+data/tier1_lightgbm.txt
+data/tier2_xgboost.bin
+data/model_metadata.json
+data/metrics_summary.json
+
+# Python cache
+backend/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
