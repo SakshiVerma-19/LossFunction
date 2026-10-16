@@ -146,18 +146,23 @@ def generate_validation_bfsi_features(raw_csv_path):
         p_info = persona_map[pid]
         p_mask = df['merchant_persona'] == pid
         
-        # Genuine: normal distribution centered within range
+        # Genuine: normal distribution centered within range (with occasional high-ticket outlier purchases)
         gen_p_mask = p_mask & (df['Class'] == 0)
         low, high = p_info["avg_range"]
         mean_val = (low + high) / 2
-        std_val = (high - low) / 5
+        std_val = (high - low) / 4
         gen_amounts = np.random.normal(mean_val, std_val, size=gen_p_mask.sum())
-        df.loc[gen_p_mask, 'amount_scaled'] = np.clip(gen_amounts, low, high * 1.5)
+        df.loc[gen_p_mask, 'amount_scaled'] = np.clip(gen_amounts, low, high * 1.8)
         
-        # Fraud: spikes towards upper limit or multiple ticket size
+        # Fraud: 70% spike towards upper ticket limit, but 30% perform low-ticket smurfing/testing
         fraud_p_mask = p_mask & (df['Class'] == 1)
-        fraud_amounts = np.random.uniform(high * 0.8, high * 2.2, size=fraud_p_mask.sum())
-        df.loc[fraud_p_mask, 'amount_scaled'] = fraud_amounts
+        n_fraud = fraud_p_mask.sum()
+        if n_fraud > 0:
+            fraud_amounts = np.zeros(n_fraud)
+            is_high_ticket = np.random.rand(n_fraud) < 0.70
+            fraud_amounts[is_high_ticket] = np.random.uniform(high * 0.7, high * 2.0, size=is_high_ticket.sum())
+            fraud_amounts[~is_high_ticket] = np.random.uniform(low, (low + high) / 2, size=(~is_high_ticket).sum())
+            df.loc[fraud_p_mask, 'amount_scaled'] = fraud_amounts
         
     df['amount_scaled'] = df['amount_scaled'].round(2)
     
@@ -165,28 +170,32 @@ def generate_validation_bfsi_features(raw_csv_path):
     cust_avg_amounts = df.groupby('customer_id')['amount_scaled'].transform('mean')
     df['amount_vs_historical_ratio'] = (df['amount_scaled'] / cust_avg_amounts).round(2)
     
-    # 5. Pincode & Logistics Distance Risk
+    # 5. Pincode & Logistics Distance Risk (Realistic E-commerce Friction)
     df['shipping_pincode'] = df['billing_pincode']
     df['pincode_distance_risk'] = 0.05 # Baseline minimal risk
     
-    remote_pincodes = ["795001", "799001", "190001", "734001", "851101"] # Remote/border high-risk fulfillment circles
+    remote_pincodes = ["795001", "799001", "190001", "734001", "851101"] # Remote/border fulfillment circles
+    metro_pins = [p["billing_pin"] for p in pincode_clusters]
     
-    # Genuine: 96% match, 4% slight variation (travel/gifting)
-    gen_mismatch_idx = np.random.choice(gen_idx, size=int(len(gen_idx) * 0.04), replace=False)
+    # Genuine: 85% match, 15% gifting/travel mismatch (risk between 0.15 and 0.45)
+    gen_mismatch_idx = np.random.choice(gen_idx, size=int(len(gen_idx) * 0.15), replace=False)
     for idx in gen_mismatch_idx:
-        df.loc[idx, 'shipping_pincode'] = np.random.choice([p["billing_pin"] for p in pincode_clusters if p["billing_pin"] != df.loc[idx, 'billing_pincode']])
-        df.loc[idx, 'pincode_distance_risk'] = 0.25
+        df.loc[idx, 'shipping_pincode'] = np.random.choice([p for p in metro_pins if p != df.loc[idx, 'billing_pincode']])
+        df.loc[idx, 'pincode_distance_risk'] = np.random.uniform(0.15, 0.45)
         
-    # Fraud: 85% high-risk distance mismatch or remote drop-shipping address
-    fraud_mismatch_idx = np.random.choice(fraud_idx, size=int(len(fraud_idx) * 0.85), replace=False)
+    # Fraud: 65% remote drop-ship/mismatch (0.65-0.90), 35% local metro pickup/resale (0.10-0.40)
+    fraud_mismatch_idx = np.random.choice(fraud_idx, size=int(len(fraud_idx) * 0.65), replace=False)
     for idx in fraud_mismatch_idx:
         df.loc[idx, 'shipping_pincode'] = np.random.choice(remote_pincodes)
-        df.loc[idx, 'pincode_distance_risk'] = np.random.uniform(0.78, 0.96)
+        df.loc[idx, 'pincode_distance_risk'] = np.random.uniform(0.65, 0.90)
+    for idx in set(fraud_idx) - set(fraud_mismatch_idx):
+        df.loc[idx, 'pincode_distance_risk'] = np.random.uniform(0.10, 0.40)
         
     # 6. Card Testing Velocity in Preceding 60 Seconds
+    # Genuine users occasionally retry failed OTPs (velocity 1 or 2); Fraudsters test or single-shot
     df['card_testing_velocity_60s'] = 0
-    df.loc[gen_idx, 'card_testing_velocity_60s'] = np.random.choice([0, 1], size=len(gen_idx), p=[0.98, 0.02])
-    df.loc[fraud_idx, 'card_testing_velocity_60s'] = np.random.choice([0, 2, 3, 4, 5, 6], size=len(fraud_idx), p=[0.10, 0.20, 0.30, 0.20, 0.10, 0.10])
+    df.loc[gen_idx, 'card_testing_velocity_60s'] = np.random.choice([0, 1, 2], size=len(gen_idx), p=[0.88, 0.10, 0.02])
+    df.loc[fraud_idx, 'card_testing_velocity_60s'] = np.random.choice([0, 1, 2, 3, 4, 5], size=len(fraud_idx), p=[0.25, 0.20, 0.25, 0.15, 0.10, 0.05])
     
     # 7. Time of Day vs Category Anomaly (3:30 AM IST Digital Goods)
     df['hour_ist'] = ((df['Time'] / 3600) % 24).astype(int)
@@ -195,21 +204,28 @@ def generate_validation_bfsi_features(raw_csv_path):
     is_instant_liquid = df['merchant_persona'].isin(['gaming_assets', 'digital_saas'])
     df['time_mcc_anomaly'] = (is_night_window & is_instant_liquid).astype(int)
     
+    # Some genuine users are night owls (students/gamers/developers)
+    night_gen_sample = np.random.choice(gen_idx, size=int(len(gen_idx) * 0.08), replace=False)
+    df.loc[night_gen_sample, 'hour_ist'] = np.random.choice([2, 3, 4], size=len(night_gen_sample))
+    df.loc[night_gen_sample, 'time_mcc_anomaly'] = (df.loc[night_gen_sample, 'merchant_persona'].isin(['gaming_assets', 'digital_saas'])).astype(int)
+    
     for idx in fraud_idx:
-        if np.random.rand() < 0.45:
+        if np.random.rand() < 0.35:
             df.loc[idx, 'hour_ist'] = np.random.choice([2, 3, 4])
             df.loc[idx, 'time_mcc_anomaly'] = 1
             
-    # 8. Device & IP Geolocation Mismatch
+    # 8. Device & IP Geolocation Mismatch (Realistic Carrier CGNAT & Account Takeover)
     df['device_mismatch'] = 0
     df['ip_mismatch'] = 0
     df['state'] = df['home_state']
     
-    df.loc[gen_idx, 'device_mismatch'] = np.random.choice([0, 1], size=len(gen_idx), p=[0.97, 0.03])
-    df.loc[gen_idx, 'ip_mismatch'] = np.random.choice([0, 1], size=len(gen_idx), p=[0.96, 0.04])
+    # Genuine users switch browsers/devices (12%) or dynamic 4G/5G cellular IPs (14%)
+    df.loc[gen_idx, 'device_mismatch'] = np.random.choice([0, 1], size=len(gen_idx), p=[0.88, 0.12])
+    df.loc[gen_idx, 'ip_mismatch'] = np.random.choice([0, 1], size=len(gen_idx), p=[0.86, 0.14])
     
-    df.loc[fraud_idx, 'device_mismatch'] = np.random.choice([0, 1], size=len(fraud_idx), p=[0.08, 0.92])
-    df.loc[fraud_idx, 'ip_mismatch'] = np.random.choice([0, 1], size=len(fraud_idx), p=[0.12, 0.88])
+    # Fraudsters use stolen cookies (25% device match) or local residential proxies (30% IP match)
+    df.loc[fraud_idx, 'device_mismatch'] = np.random.choice([0, 1], size=len(fraud_idx), p=[0.25, 0.75])
+    df.loc[fraud_idx, 'ip_mismatch'] = np.random.choice([0, 1], size=len(fraud_idx), p=[0.30, 0.70])
     
     all_states = [p["state"] for p in pincode_clusters]
     for idx in df[df['ip_mismatch'] == 1].index:
@@ -217,10 +233,7 @@ def generate_validation_bfsi_features(raw_csv_path):
         df.loc[idx, 'state'] = np.random.choice(other_states)
         
     # 9. Rolling 1-Hour Velocity
-    # Compute rolling count using a fast numeric window
     df = df.sort_values(by='Time').reset_index(drop=True)
-    
-    # Use pandas datetime rolling for 1h window
     df['dt_temp'] = pd.to_datetime(df['Time'], unit='s')
     df['velocity_1h'] = (
         df.groupby('customer_id', group_keys=False)
@@ -231,13 +244,13 @@ def generate_validation_bfsi_features(raw_csv_path):
     df.drop(columns=['dt_temp'], inplace=True)
     
     for idx in fraud_idx:
-        df.loc[idx, 'velocity_1h'] += np.random.randint(2, 5)
+        if np.random.rand() < 0.60:
+            df.loc[idx, 'velocity_1h'] += np.random.randint(1, 3)
         
     # ── 10. Payment Method Overlay ────────────────────────────────────────────
-    # Assign payment method: genuine skews card/UPI; fraud skews UPI (high velocity)
     pm_options = ["card", "upi", "netbanking"]
-    pm_probs_gen   = [0.50, 0.35, 0.15]
-    pm_probs_fraud = [0.30, 0.55, 0.15]   # Fraud prefers UPI (instant, harder to reverse)
+    pm_probs_gen   = [0.48, 0.38, 0.14]
+    pm_probs_fraud = [0.35, 0.48, 0.17]
 
     df['payment_method'] = ""
     df.loc[gen_idx,   'payment_method'] = np.random.choice(pm_options, size=len(gen_idx),   p=pm_probs_gen)
@@ -248,27 +261,39 @@ def generate_validation_bfsi_features(raw_csv_path):
     upi_gen_idx   = df[df['payment_method'] == 'upi'].index.intersection(gen_idx)
     upi_fraud_idx = df[df['payment_method'] == 'upi'].index.intersection(fraud_idx)
 
-    # VPA — e.g. cust1234@okicici
+    # VPA assignment
     df['vpa'] = None
-    df.loc[upi_gen_idx,   'vpa'] = [
+    df.loc[upi_gen_idx, 'vpa'] = [
         f"{cid.lower().replace('_', '')}@{np.random.choice(upi_banks)}"
         for cid in df.loc[upi_gen_idx, 'customer_id']
     ]
     df.loc[upi_fraud_idx, 'vpa'] = [
-        # Fraud often uses randomly generated / disposable VPAs
         f"usr{hashlib.md5(str(idx).encode()).hexdigest()[:6]}@{np.random.choice(upi_banks)}"
         for idx in upi_fraud_idx
     ]
 
     # UPI velocity in last 60 seconds
     df['upi_velocity_60s'] = 0
-    df.loc[upi_gen_idx,   'upi_velocity_60s'] = np.random.choice([0, 1],          size=len(upi_gen_idx),   p=[0.92, 0.08])
-    df.loc[upi_fraud_idx, 'upi_velocity_60s'] = np.random.choice([1, 2, 3, 4, 5], size=len(upi_fraud_idx), p=[0.10, 0.25, 0.30, 0.20, 0.15])
+    df.loc[upi_gen_idx,   'upi_velocity_60s'] = np.random.choice([0, 1, 2],       size=len(upi_gen_idx),   p=[0.85, 0.12, 0.03])
+    df.loc[upi_fraud_idx, 'upi_velocity_60s'] = np.random.choice([0, 1, 2, 3, 4], size=len(upi_fraud_idx), p=[0.25, 0.25, 0.25, 0.15, 0.10])
 
-    # VPA account age in days (new accounts are riskier)
+    # VPA account age in days (with realistic mutual overlap)
+    # Genuine: 85% aged (90-1200 days), 15% new users (5-90 days)
+    # Fraud: 70% fresh/disposable (1-60 days), 30% aged/sleeper accounts (90-450 days)
     df['vpa_age_days'] = 0
-    df.loc[upi_gen_idx,   'vpa_age_days'] = np.random.randint(180, 1800, size=len(upi_gen_idx))
-    df.loc[upi_fraud_idx, 'vpa_age_days'] = np.random.randint(0,   60,   size=len(upi_fraud_idx))  # Fraud = fresh VPA
+    gen_upi_n = len(upi_gen_idx)
+    if gen_upi_n > 0:
+        gen_ages = np.random.randint(90, 1200, size=gen_upi_n)
+        new_vpa_mask = np.random.rand(gen_upi_n) < 0.15
+        gen_ages[new_vpa_mask] = np.random.randint(5, 90, size=new_vpa_mask.sum())
+        df.loc[upi_gen_idx, 'vpa_age_days'] = gen_ages
+
+    fraud_upi_n = len(upi_fraud_idx)
+    if fraud_upi_n > 0:
+        fraud_ages = np.random.randint(1, 60, size=fraud_upi_n)
+        aged_fraud_mask = np.random.rand(fraud_upi_n) < 0.30
+        fraud_ages[aged_fraud_mask] = np.random.randint(90, 450, size=aged_fraud_mask.sum())
+        df.loc[upi_fraud_idx, 'vpa_age_days'] = fraud_ages
 
     # ── Net-Banking signals ───────────────────────────────────────────────────
     ifsc_prefixes = ["HDFC", "SBIN", "ICIC", "UTIB", "PUNB", "BARB", "CNRB"]
@@ -285,7 +310,7 @@ def generate_validation_bfsi_features(raw_csv_path):
         for _ in range(len(nb_fraud_idx))
     ]
 
-    # Hashed bank account number (never store raw account numbers)
+    # Hashed bank account number
     df['bank_account_hash'] = df.apply(
         lambda row: hashlib.sha256(
             f"{row['customer_id']}_{row.get('ifsc_code', '')}".encode()
@@ -294,10 +319,23 @@ def generate_validation_bfsi_features(raw_csv_path):
         axis=1
     )
 
-    # Net-banking session risk: genuine sessions are low risk; fraud sessions show anomaly
+    # Net-banking session risk: continuous overlapping distributions
+    # Genuine: mostly low (0.05-0.35), 18% elevated due to VPN/public Wi-Fi (0.35-0.60)
+    # Fraud: mostly elevated (0.50-0.88), 22% stealth/residential (0.20-0.45)
     df['netbanking_session_risk'] = 0.0
-    df.loc[nb_gen_idx,   'netbanking_session_risk'] = np.random.uniform(0.01, 0.15, size=len(nb_gen_idx))
-    df.loc[nb_fraud_idx, 'netbanking_session_risk'] = np.random.uniform(0.60, 0.98, size=len(nb_fraud_idx))
+    nb_gen_n = len(nb_gen_idx)
+    if nb_gen_n > 0:
+        gen_risk = np.random.uniform(0.05, 0.35, size=nb_gen_n)
+        elev_mask = np.random.rand(nb_gen_n) < 0.18
+        gen_risk[elev_mask] = np.random.uniform(0.35, 0.60, size=elev_mask.sum())
+        df.loc[nb_gen_idx, 'netbanking_session_risk'] = np.round(gen_risk, 3)
+
+    nb_fraud_n = len(nb_fraud_idx)
+    if nb_fraud_n > 0:
+        fraud_risk = np.random.uniform(0.50, 0.88, size=nb_fraud_n)
+        stealth_mask = np.random.rand(nb_fraud_n) < 0.22
+        fraud_risk[stealth_mask] = np.random.uniform(0.20, 0.45, size=stealth_mask.sum())
+        df.loc[nb_fraud_idx, 'netbanking_session_risk'] = np.round(fraud_risk, 3)
 
     # ── Composite payment method risk score (numeric signal for model) ────────
     # card: baseline; upi: depends on velocity & VPA age; netbanking: session risk

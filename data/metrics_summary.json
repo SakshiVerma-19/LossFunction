@@ -1,79 +1,79 @@
 {
-    "roc_auc": 0.9999976090054419,
-    "pr_auc": 0.9994462901439647,
+    "roc_auc": 0.9998105793450881,
+    "pr_auc": 0.9811233604326681,
     "latency": {
         "tier1_avg_ms": 0.0,
         "tier2_queue_ms": 45.2
     },
     "costs": {
-        "allow_all": 1759184.88,
-        "limit_large": 39317365.267400004,
-        "static_ml": 3860.0,
-        "cost_optimal": 3860.0,
-        "savings_vs_allow_all": 1755324.88,
-        "savings_vs_static_ml": 0.0
+        "allow_all": 2765660.68,
+        "limit_large": 39196973.771599986,
+        "static_ml": 110759.8595,
+        "cost_optimal": 235879.7808,
+        "savings_vs_allow_all": 2529780.8992000003,
+        "savings_vs_static_ml": -125119.9213
     },
     "personas": {
         "digital_saas": {
             "name": "Digital SaaS & Subscriptions",
-            "allow_all": 19800.0,
-            "limit_large": 19800.0,
-            "static_ml": 2200.0,
-            "cost_optimal": 2200.0,
-            "savings_vs_allow_all": 17600.0,
-            "savings_vs_static_ml": 0.0,
-            "avg_p_star": 0.6925832103798215
+            "allow_all": 28800.0,
+            "limit_large": 28800.0,
+            "static_ml": 16047.2145,
+            "cost_optimal": 4160.0,
+            "savings_vs_allow_all": 24640.0,
+            "savings_vs_static_ml": 11887.2145,
+            "avg_p_star": 0.6924348044404329
         },
         "electronics": {
             "name": "High-Value Electronics Retail",
-            "allow_all": 1279825.64,
-            "limit_large": 12078476.754399987,
-            "static_ml": 880.0,
-            "cost_optimal": 880.0,
-            "savings_vs_allow_all": 1278945.64,
-            "savings_vs_static_ml": 0.0,
-            "avg_p_star": 0.09152005955031278
+            "allow_all": 2244227.12,
+            "limit_large": 11999329.121599983,
+            "static_ml": 27299.272000000004,
+            "cost_optimal": 156392.0968,
+            "savings_vs_allow_all": 2087835.0232000002,
+            "savings_vs_static_ml": -129092.8248,
+            "avg_p_star": 0.09210274509125245
         },
         "quick_commerce": {
             "name": "Quick Commerce & Food Delivery",
-            "allow_all": 44257.159999999996,
-            "limit_large": 44257.159999999996,
-            "static_ml": 330.0,
-            "cost_optimal": 330.0,
-            "savings_vs_allow_all": 43927.159999999996,
-            "savings_vs_static_ml": 0.0,
-            "avg_p_star": 0.4573371032245645
+            "allow_all": 40402.56,
+            "limit_large": 40402.560000000005,
+            "static_ml": 8610.420999999998,
+            "cost_optimal": 12348.667,
+            "savings_vs_allow_all": 28053.892999999996,
+            "savings_vs_static_ml": -3738.246000000001,
+            "avg_p_star": 0.458918909871161
         },
         "gaming_assets": {
             "name": "Gaming & Digital Assets",
-            "allow_all": 415302.08,
-            "limit_large": 27174831.35300002,
-            "static_ml": 450.0,
-            "cost_optimal": 450.0,
-            "savings_vs_allow_all": 414852.08,
-            "savings_vs_static_ml": 0.0,
-            "avg_p_star": 0.39132227791076757
+            "allow_all": 452231.0,
+            "limit_large": 27128442.090000004,
+            "static_ml": 58802.952,
+            "cost_optimal": 62979.017,
+            "savings_vs_allow_all": 389251.983,
+            "savings_vs_static_ml": -4176.065000000002,
+            "avg_p_star": 0.3892069098617697
         }
     },
     "confusion_matrices": {
         "static_ml": [
             [
-                9958,
-                0
+                9909,
+                16
             ],
             [
-                1,
-                41
+                3,
+                72
             ]
         ],
         "cost_optimal": [
             [
-                9958,
-                0
+                9884,
+                41
             ],
             [
-                1,
-                41
+                3,
+                72
             ]
         ]
     }

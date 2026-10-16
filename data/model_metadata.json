@@ -11,34 +11,6 @@
         "upi_velocity_60s"
     ],
     "tier2_features": [
-        "V1",
-        "V2",
-        "V3",
-        "V4",
-        "V5",
-        "V6",
-        "V7",
-        "V8",
-        "V9",
-        "V10",
-        "V11",
-        "V12",
-        "V13",
-        "V14",
-        "V15",
-        "V16",
-        "V17",
-        "V18",
-        "V19",
-        "V20",
-        "V21",
-        "V22",
-        "V23",
-        "V24",
-        "V25",
-        "V26",
-        "V27",
-        "V28",
         "amount_scaled",
         "amount_vs_historical_ratio",
         "pincode_distance_risk",
@@ -56,12 +28,12 @@
         "netbanking_session_risk"
     ],
     "mcc_encoding": {
-        "5732": 0.009007223555288942,
-        "5734": 0.009501423860911271,
-        "5812": 0.008014454437635897,
-        "7995": 0.009593447336561745
+        "5732": 0.010508323335332933,
+        "5734": 0.008403702038369303,
+        "5812": 0.011475019766752323,
+        "7995": 0.011309952582728006
     },
-    "global_prior": 0.009025,
+    "global_prior": 0.010425,
     "personas_config": {
         "digital_saas": {
             "name": "Digital SaaS & Subscriptions",
@@ -105,7 +77,7 @@
         }
     },
     "latency_benchmarks": {
-        "tier1_single_tx_ms": 0.001,
+        "tier1_single_tx_ms": 0.002,
         "tier2_queue_ms": 45.2
     }
 }

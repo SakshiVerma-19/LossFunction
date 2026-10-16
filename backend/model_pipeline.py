@@ -70,9 +70,8 @@ def train_and_evaluate_two_tier():
         'upi_velocity_60s',
     ]
     
-    # Tier 2 Deep Features (Full feature set including PCA and cross-logistics anomalies)
-    pca_cols = [f'V{i}' for i in range(1, 29)]
-    tier2_features = pca_cols + [
+    # Tier 2 Deep Features (Rich behavioral & payment signals, without Kaggle PCA shortcuts)
+    tier2_features = [
         'amount_scaled',
         'amount_vs_historical_ratio',
         'pincode_distance_risk',
